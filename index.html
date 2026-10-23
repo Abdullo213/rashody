@@ -168,6 +168,10 @@ input,select,textarea{-webkit-user-select:text;user-select:text}
   <h2 style="margin-top:4px">Счета и кошельки</h2>
   <div class="card" id="acc"></div>
   <div class="card"><div class="form"><input class="fld full" id="wn" placeholder="Новый счёт, например «Алиф Банк»"><input class="fld" id="ws" type="number" inputmode="decimal" placeholder="Начальный остаток"><select class="fld" id="wk"><option value="💵">💵 Наличные</option><option value="💳">💳 Карта</option><option value="🏦">🏦 Счёт</option></select><button class="btn full" id="wadd">Добавить счёт</button></div></div>
+  <h2>Остаток и переводы</h2>
+  <div class="card"><div class="lh" style="margin-bottom:8px">Сколько сейчас на счёте</div><div class="form"><select class="fld" id="ba"></select><input class="fld" id="bv" type="number" inputmode="decimal" placeholder="Сумма"><button class="btn full" id="bset">Установить остаток</button></div></div>
+  <div class="card"><div class="lh" style="margin-bottom:8px">Перевод и снятие наличных</div><div class="form"><select class="fld" id="tf" aria-label="Откуда"></select><select class="fld" id="tt" aria-label="Куда"></select><input class="fld full" id="tamt" type="number" inputmode="decimal" placeholder="Сумма"><button class="btn full" id="tadd">Перевести</button></div><div class="hint" style="margin:10px 0 0">Например, снял с карты наличные: откуда «Карта», куда «Наличные». Переводы не считаются расходами.</div></div>
+  <div id="tlist"></div>
   <h2>Финансовые цели</h2>
   <div id="goals"></div>
   <div class="card"><div class="form"><input class="fld full" id="gn" placeholder="Цель, например «Отпуск»"><input class="fld" id="gt" type="number" inputmode="decimal" placeholder="Сколько нужно"><input class="fld" id="gd" type="date" aria-label="К какой дате"><button class="btn full" id="gadd">Добавить цель</button></div></div>
@@ -674,7 +678,7 @@ mergeIn=function(d){
 };
 var _view=view;
 view=function(v){["cal","more"].forEach(function(k){$("v-"+k).hidden=k!==v});_view(v);if(v==="cal")drawCal();if(v==="more")drawMore()};
-if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)navigator.serviceWorker.register("sw.js").catch(function(){});
+if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)(function(){var had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",function(){if(had)location.reload()});navigator.serviceWorker.register("sw.js").catch(function(){})})();
 onType();render();
 </script>
 <script>
@@ -745,6 +749,35 @@ runRec();render();
 <script>
 ["gesturestart","gesturechange","gestureend"].forEach(function(n){document.addEventListener(n,function(e){e.preventDefault()},{passive:false})});
 document.addEventListener("touchmove",function(e){if(e.touches.length>1)e.preventDefault()},{passive:false});
+</script>
+<script>
+/* v4: остаток счёта и переводы (снятие наличных) */
+if(!S.tr)S.tr=[];
+accBal=function(a){var b=num(a.s);
+  S.inc.forEach(function(x){if(wid(x)===a.id)b+=x.a});S.ex.forEach(function(x){if(wid(x)===a.id)b-=x.a});
+  S.tr.forEach(function(x){if(x.f===a.id)b-=x.a;if(x.to===a.id)b+=x.a});return b};
+function fillTr(){
+  var E=[$("ba"),$("tf"),$("tt")],v=E.map(function(e){return e.value}),o=S.acc.map(function(a){return '<option value="'+a.id+'">'+a.e+" "+esc(a.n)+"</option>"}).join("");
+  E.forEach(function(e,i){e.innerHTML=o;if(v[i]&&S.acc.some(function(a){return a.id===v[i]}))e.value=v[i]});
+  if(!v[1]){$("tf").value=S.acc[S.acc.length>1?1:0].id;$("tt").value=S.acc[0].id}
+}
+function accOf(id){return S.acc.filter(function(a){return a.id===id})[0]||{e:"❔",n:"удалён"}}
+function drawTr(){
+  $("tlist").innerHTML=S.tr.slice(0,10).map(function(x){var f=accOf(x.f),t=accOf(x.to);
+    return '<div class="item"><div class="dot" style="background:#94a3b826">🔄</div><div class="m"><div>'+f.e+" "+esc(f.n)+" → "+t.e+" "+esc(t.n)+"</div><small>"+new Date(x.t).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+'</small></div><span class="a">'+fmt(x.a)+'</span><button class="x" data-tx="'+x.id+'" aria-label="Удалить">×</button></div>'}).join("");
+}
+$("tlist").addEventListener("click",function(e){var b=e.target.closest("[data-tx]");if(!b)return;var id=+b.dataset.tx;S.tr=S.tr.filter(function(x){return x.id!==id});save();drawAcc();drawTr()});
+$("bset").onclick=function(){
+  if($("bv").value==="")return;var a=accOf($("ba").value),v=num($("bv").value);if(!a.id)return;
+  a.s=num(a.s)+(v-accBal(a));$("bv").value="";save();drawAcc();render();
+};
+$("tadd").onclick=function(){
+  var f=$("tf").value,t=$("tt").value,a=num($("tamt").value);if(!(a>0)||f===t)return;
+  S.tr.unshift({id:Date.now(),t:Date.now(),a:a,f:f,to:t});$("tamt").value="";save();drawAcc();drawTr();
+};
+var _dm2=drawMore;drawMore=function(){_dm2();fillTr();drawTr()};
+var _mi2=mergeIn;
+mergeIn=function(d){var n=_mi2(d);(d.tr||[]).forEach(function(x){if(x&&x.id&&!S.tr.some(function(z){return z.id===x.id}))S.tr.push(x)});S.tr.sort(function(a,b){return b.t-a.t});save();return n};
 </script>
 </body>
 </html>
