@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Расходы">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -110,6 +110,10 @@ nav#nav button span{font-size:21px}nav#nav button.on{color:var(--acc);font-weigh
 .mpair .bw i,.mstack .bw i{opacity:.6}.mpair .col.on .bw i,.mstack .col.on .bw i{opacity:1}
 .leg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:12px;color:var(--mute)}.leg b{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
 .tabs.sm button{font-size:13px;padding:7px 0}
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,select,textarea{-webkit-user-select:text;user-select:text}
+@media (pointer:coarse){input,select,textarea{font-size:16px!important}}
 </style>
 
 </head>
@@ -737,6 +741,10 @@ function chartView(){
 var _dc3=drawChart;drawChart=function(){_dc3();chartView()};
 $("ttabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;ctype=b.dataset.t;drawChart()});
 runRec();render();
+</script>
+<script>
+["gesturestart","gesturechange","gestureend"].forEach(function(n){document.addEventListener(n,function(e){e.preventDefault()},{passive:false})});
+document.addEventListener("touchmove",function(e){if(e.touches.length>1)e.preventDefault()},{passive:false});
 </script>
 </body>
 </html>
