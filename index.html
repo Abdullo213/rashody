@@ -205,6 +205,7 @@ nav#nav button.on{color:var(--acc);font-weight:700}nav#nav button.on span{backgr
 #shb::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:var(--line);margin:-6px auto 12px}
 #toast{border-radius:18px}
 #cam,#mode{display:none}
+.x.sure{color:#fff;background:#ef4444;border-radius:10px;font-size:13px;padding:6px 10px;font-weight:700}
 .cat .r{color:inherit}
 .wrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}.wrow .seg{flex:1;margin:0;min-width:0}#dt{flex:none}
 .hint{margin:0 2px 6px}
@@ -733,7 +734,14 @@ $("cday").addEventListener("click",function(e){var o=e.target.closest("[data-o]"
 $("cprev").onclick=function(){cmo--;cd=null;drawCal()};$("cnext").onclick=function(){cmo++;cd=null;drawCal()};
 /* счета, цели, поиск, экспорт */
 function drawAcc(){var tot=0;$("acc").innerHTML=S.acc.map(function(a,i){var b=accBal(a);tot+=b;return '<div class="cr"><div>'+a.e+" "+esc(a.n)+'</div><b class="'+(b<0?"r":"")+'">'+fmt(b)+"</b>"+(S.acc.length>1?'<button class="x" data-ax="'+i+'" aria-label="Удалить">×</button>':"<span></span>")+"</div>"}).join("")+'<div class="cr"><div><b>Всего</b></div><b>'+fmt(tot)+"</b><span></span></div>"}
-$("acc").addEventListener("click",function(e){var b=e.target.closest("[data-ax]");if(!b)return;S.acc.splice(+b.dataset.ax,1);save();drawAcc();render()});
+$("acc").addEventListener("click",function(e){
+  var b=e.target.closest("[data-ax]");if(!b)return;
+  var i=+b.dataset.ax,a=S.acc[i];if(!a)return;
+  var used=S.ex.some(function(x){return wid(x)===a.id})||S.inc.some(function(x){return wid(x)===a.id})||(S.tr||[]).some(function(x){return x.f===a.id||x.to===a.id});
+  if(used){alertMsg("Нельзя удалить счёт «"+a.n+"»: по нему есть записи",true);return}
+  if(b.dataset.sure!=="1"){b.dataset.sure="1";b.textContent="Удалить?";b.classList.add("sure");setTimeout(function(){b.dataset.sure="";b.textContent="×";b.classList.remove("sure")},3500);return}
+  S.acc.splice(i,1);save();drawAcc();render();
+});
 $("wadd").onclick=function(){var n=$("wn").value.trim();if(!n)return;S.acc.push({id:"a"+Date.now(),n:n,e:$("wk").value,s:num($("ws").value)});$("wn").value="";$("ws").value="";save();drawAcc();render()};
 function drawGoals(){
   $("goals").innerHTML=S.goals.length?S.goals.map(function(g,i){
@@ -1052,6 +1060,25 @@ add=function(){
     alertMsg("Перевод: "+accOf(f).n+" → "+accOf(t).n+", "+fmt(p.a),"ok");return}
   _a8();
 };
+/* защита счетов и возврат «Карты» */
+function needCard(){
+  var has=S.acc.some(function(a){return a.id==="card"}),named=S.acc.some(function(a){return /карт/i.test(a.n)});
+  var orphan=S.ex.some(function(x){return x.w==="card"})||S.inc.some(function(x){return x.w==="card"})||S.tr.some(function(x){return x.f==="card"||x.to==="card"});
+  return !has&&(!named||orphan);
+}
+function restoreCard(){
+  var card=S.acc.filter(function(a){return /карт/i.test(a.n)})[0];
+  if(!card){card={id:"card",n:"Карта",e:"💳",s:0};S.acc.push(card)}
+  if(card.id!=="card"){
+    var fix=function(x){if(x.w==="card")x.w=card.id};
+    S.ex.forEach(fix);S.inc.forEach(fix);(S.rec||[]).forEach(fix);
+    S.tr.forEach(function(x){if(x.f==="card")x.f=card.id;if(x.to==="card")x.to=card.id});
+  }
+  save();drawAcc();render();alertMsg("Счёт «Карта» возвращён вместе с её операциями","ok");
+}
+var _da8=drawAcc;
+drawAcc=function(){_da8();if(needCard())$("acc").insertAdjacentHTML("beforeend",'<div class="cr"><button class="btn ghost" id="rcard" style="grid-column:1/4;width:100%">＋ Вернуть счёт «Карта»</button></div>')};
+$("acc").addEventListener("click",function(e){if(e.target.id==="rcard")restoreCard()});
 /* главная: баланс, счета, переводы */
 var _iv=incView;
 incView=function(){
@@ -1059,13 +1086,14 @@ incView=function(){
   var r=range(S.per,off),ti=sumR(S.inc,r),te=sumR(S.ex,r),w=$("wal").value;
   $("sum").textContent=fmt(ti-te);
   $("kpi").innerHTML='<div><small>↓ Доходы</small><b>+'+fmt(ti)+'</b></div><div><small>↑ Расходы</small><b>−'+fmt(te)+"</b></div>";
-  $("wallets").innerHTML=S.acc.map(function(a){var b=accBal(a);return'<button class="wc'+(a.id===w?" on":"")+'" data-w="'+a.id+'"><span>'+a.e+"</span><small>"+esc(a.n)+'</small><b class="'+(b<0?"r":"")+'">'+fmt(b)+"</b></button>"}).join("")+'<button class="wc add" id="wtr"><span>⇄</span><small>Перевод</small><b>между счетами</b></button>';
+  $("wallets").innerHTML=S.acc.map(function(a){var b=accBal(a);return'<button class="wc'+(a.id===w?" on":"")+'" data-w="'+a.id+'"><span>'+a.e+"</span><small>"+esc(a.n)+'</small><b class="'+(b<0?"r":"")+'">'+fmt(b)+"</b></button>"}).join("")+(needCard()?'<button class="wc add" id="wcard"><span>💳</span><small>Вернуть Карту</small><b>одно касание</b></button>':"")+'<button class="wc add" id="wtr"><span>⇄</span><small>Перевод</small><b>между счетами</b></button>';
   var T=S.tr.filter(function(x){return inR(x,r)});
   if(T.length)$("ibox").innerHTML+="<h2>Переводы</h2>"+T.slice(0,10).map(function(x){var f=accOf(x.f),t=accOf(x.to);
     return'<div class="item"><div class="dot" style="background:#94a3b826">⇄</div><div class="m"><div>'+f.e+" "+esc(f.n)+" → "+t.e+" "+esc(t.n)+"</div><small>"+new Date(x.t).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+'</small></div><span class="a">'+fmt(x.a)+'</span><button class="x" data-tx="'+x.id+'" aria-label="Удалить">×</button></div>'}).join("");
 };
 $("wallets").addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
+  if(b.id==="wcard"){restoreCard();return}
   if(b.id==="wtr"){setMode("t");$("inp").focus();return}
   $("wal").value=b.dataset.w;if(mode==="t")setMode("e");render();
 });
